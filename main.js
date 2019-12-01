@@ -2,6 +2,19 @@ const express = require('express')
 const app = express()
 var cors = require('cors')
 app.use(cors())
+var bcrypt = require('bcryptjs');
+var mysql = require('mysql');
+var con = mysql.createConnection({
+    host: "localhost",
+    user: "root",
+    password: "",
+    database: "reporter"
+  });
+  
+  con.connect(function(err) {
+    if (err) throw err;
+    console.log("Connected!");
+  });
 const port = 3000
 app.use(express.json());
 app.get('/', (req, res) => res.send('Hello World!'))
@@ -17,12 +30,23 @@ app.post("/signin",(req,res)=>{
         }
 
         else{
-            if(req.body.username === "admin" && req.body.passwrd === "admin"){
-                res.json({ status : true , msg : "Authenticated" }).end()
-            }
-            else{
-                res.json({ status : false , msg : "Invalid Request" }).end()
-            }
+            con.query("SELECT passwrd FROM users WHERE user = ?", [req.body.username], function (err, result, fields) {
+                if (err) throw err;
+                console.log(result);
+                if(result.length !==0 ){
+                    if(bcrypt.compareSync(req.body.passwrd, result[0].passwrd)){
+                        res.json({ status : true , msg : "Authenticated" }).end()
+                    }
+                    else{
+                        res.json({ status : false , msg : "Invalid Username or Password" }).end()
+                    }
+                    
+                }
+                else{
+                    res.json({ status : false , msg : "Invalid Username or Password" }).end()
+                }
+              });
+            
         }
 
     }
@@ -42,12 +66,25 @@ app.post("/signup",(req,res)=>{
         }
 
         else{
-            if(req.body.username !== 'admin'){
-                res.json({ status : true , msg : "New User added" }).end()
-            }
-            else{
-                res.json({ status : true , msg : "User Already Present" }).end()
-            }
+            con.query("SELECT user FROM users WHERE user = ?", [req.body.username], function (err, result, fields) {
+                if (err) throw err;
+                console.log(result.length);
+                if(result.length === 0){
+                    let hashpasswrd  = bcrypt.hashSync(req.body.passwrd, 8);
+                    let sql = "INSERT INTO users (user, passwrd) VALUES (?, ?)";
+                    con.query(sql,[req.body.username,hashpasswrd] ,function (err, result) {
+                      if (err) throw err;
+                      console.log("1 record inserted");
+                      res.json({ status : true , msg : "New User added" }).end()
+                    });
+                }
+                else{
+                    res.json({ status : false , msg : "User Already Present" }).end()
+                }
+               
+                
+              });
+           
         }
 
     }
